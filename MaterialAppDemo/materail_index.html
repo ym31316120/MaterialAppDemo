@@ -20,23 +20,25 @@
 		<script src="lib/angularjs_1.4.7/angular-aria.js"></script>
 	</head>
 	<body>
-		<div layout="row">
-			<div flex>
-				First item in row{{'hellowwer'}}
-			</div>
-			<div flex>
-				Second item in row
-			</div>
-		</div>
-		<div layout="column">
-			<div flex>
-				First item in column
-			</div>
-			<div flex>
-				Second item in column
-			</div>
-		</div>
-		<script src="lib/angular-material/angular-material.js"></script>
+<div layout="row" layout-wrap>
+  <div hide show-gt-sm flex>
+    Hidden on small and shown on larger devices.
+  </div>
+  <div hide-gt-sm flex>
+    Shown on small and hidden on larger devices.
+  </div>
+  <div hide-gt-md flex>
+    Shown on small and medium size devices.
+  </div>
+  <div hide show-md flex>
+    Shown on medium size devices only.
+  </div>
+  <div hide show-gt-lg flex>
+    Shown on devices larger than 1200px wide only.
+  </div>
+</div>
+		<!-- <script src="lib/angular-material/angular-material.js"></script> -->
 		<script src="js/app.js"></script>
+		<script src="src/core/layout/hy_layout.js"></script>
 	</body>
 </html>
