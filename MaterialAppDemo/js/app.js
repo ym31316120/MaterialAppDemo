@@ -7,25 +7,41 @@ app.controller('TitleController',function($scope){
 });
 
 app.controller('ListCtrl', function($scope, $mdDialog) {
-  $scope.toppings = [
-    { name: 'Pepperoni', wanted: true },
-    { name: 'Sausage', wanted: false },
-    { name: 'Black Olives', wanted: true },
-    { name: 'Green Peppers', wanted: false }
-  ];
-  $scope.settings = [
-    { name: 'Wi-Fi', extraScreen: 'Wi-fi menu', icon: 'device:network-wifi', enabled: true },
-    { name: 'Bluetooth', extraScreen: 'Bluetooth menu', icon: 'device:bluetooth', enabled: false },
-  ];
-  $scope.messages = [
-    {id: 1, title: "Message A", selected: false},
-    {id: 2, title: "Message B", selected: true},
-    {id: 3, title: "Message C", selected: true},
-  ];
-  $scope.people = [
-    { name: 'Janet Perkins', img: 'img/100-0.jpeg', newMessage: true },
-    { name: 'Mary Johnson', img: 'img/100-1.jpeg', newMessage: false },
-    { name: 'Peter Carlsson', img: 'img/100-2.jpeg', newMessage: false }
+  
+  $scope.uilist = [
+    { name: 'AutoComplete', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Bottom Sheet', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Button', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Card', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'CheckBox', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Chips', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Content', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Datepicker', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Dialog', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Divider', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'FAB Speed Dial', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'FAB Toolbar', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Grid List', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Icon', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Input', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'List', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Menu', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Menu Bar', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Progress Circular', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Progress Linear', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Radio Button', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Select', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Sidenav', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Slider', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Subheader', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Swipe', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Switch', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Tabs', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Toast', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Toolbar', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Tooltip', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Virtual Repeat', img: 'img/angular-logo.svg', newMessage: true, url:'#' },
+    { name: 'Whiteframe', img: 'img/angular-logo.svg', newMessage: true, url:'#' }
   ];
   $scope.goToPerson = function(person, event) {
     $mdDialog.show(
