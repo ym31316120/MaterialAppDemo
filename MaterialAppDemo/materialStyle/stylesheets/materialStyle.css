@@ -1,0 +1,114 @@
+/* line 6, ../sass/structure.scss */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* line 30, ../sass/layout.scss */
+.flex {
+  flex: 1;
+  box-sizing: border-box;
+}
+
+/* line 31, ../sass/layout.scss */
+.flex-grow {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+}
+
+/* line 32, ../sass/layout.scss */
+.flex-initial {
+  flex: 0 1 auto;
+  box-sizing: border-box;
+}
+
+/* line 33, ../sass/layout.scss */
+.flex-auto {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+}
+
+/* line 34, ../sass/layout.scss */
+.flex-none {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+/* line 8, ../sass/layout.scss */
+.layout, .layout-column, .layout-row {
+  box-sizing: border-box;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+/* line 16, ../sass/layout.scss */
+.layout-column {
+  flex-direction: column;
+}
+
+/* line 17, ../sass/layout.scss */
+.layout-row {
+  flex-direction: row;
+}
+
+/* line 41, ../sass/layout.scss */
+.layout-padding > .flex-sm, .layout-padding > .flex-lt-md {
+  padding: 4px;
+}
+
+/* line 44, ../sass/layout.scss */
+.layout-padding,
+.layout-padding > .flex,
+.layout-padding > .flex-gt-sm,
+.layout-padding > .flex-md,
+.layout-padding > .flex-lt-lg {
+  padding: 8px;
+}
+
+/* line 52, ../sass/layout.scss */
+.layout-padding > .flex-gt-md,
+.layout-padding > .flex-lg {
+  padding: 16px;
+}
+
+/* line 58, ../sass/layout.scss */
+.layout-margin > .flex-sm,
+.layout-margin > .flex-lt-md {
+  margin: 4px;
+}
+
+/* line 64, ../sass/layout.scss */
+.layout-margin,
+.layout-margin > .flex,
+.layout-margin > .flex-gt-sm,
+.layout-margin > .flex-md,
+.layout-margin > .flex-lt-lg {
+  margin: 8px;
+}
+
+/* line 73, ../sass/layout.scss */
+.layout-margin > .flex-gt-md,
+.layout-margin > .flex-lg {
+  margin: 16px;
+}
+
+/* line 79, ../sass/layout.scss */
+.layout-wrap {
+  flex-wrap: wrap;
+}
+
+/* line 83, ../sass/layout.scss */
+.layout-nowrap {
+  flex-wrap: nowrap;
+}
+
+/* line 87, ../sass/layout.scss */
+.layout-fill {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+}

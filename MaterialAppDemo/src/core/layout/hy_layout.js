@@ -9,6 +9,7 @@
     var $mdUtil, $interpolate;
     var SUFFIXES = /(-gt)?-(sm|md|lg)/g;
     var WHITESPACE = /\s+/g;
+    var FLEX_OPTIONS = ['grow', 'initial', 'auto', 'none'];
     var LAYOUT_OPTIONS = ['row', 'column'];
     //正则表达式  \s表示空格，+表示一个或多个，/g表示全局，整体就是要替换一个或多个空格
     var config = {
@@ -19,7 +20,10 @@
     /**
      * 创建一个layout的模块
      */
-    angular.module('hyMaterial.core.layout', ['ng']).directive('layout', attributeWithOberve('layout')).directive('layoutWrap', attributeWithoutValue('layout-wrap'));
+    angular.module('hyMaterial.core.layout', ['ng'])
+    .directive('layout', attributeWithOberve('layout'))
+    .directive('flex', attributeWithOberve('flex'))
+    .directive('layoutWrap', attributeWithoutValue('layout-wrap'));
 
     /**
      * 创建一个对动态属性进行处理的指令注册函数
@@ -51,7 +55,7 @@
 
             updateFn(getNormalizedAttrValue(className, attrs, ""));
             scope.$on("$destroy", function() {
-                console.log('layout-destory');
+                console.log('layout-destory is begin');
                 unwatch()
             });
 
@@ -88,7 +92,6 @@
          * 转换，增加类属性，并移除原有的属性
          */
         function translateToCssClass(scope, element) {
-            console.log("remove Class");
             element.addClass(className);
             if (config.removeAttributes) {
                 element.removeAttr(className);
