@@ -44,14 +44,14 @@ app.controller('ListCtrl', function($scope, $mdDialog) {
     { name: 'Whiteframe', img: 'img/angular-logo.svg', newMessage: true, url:'#' }
   ];
   $scope.goToPerson = function(person, event) {
-    $mdDialog.show(
-      $mdDialog.alert()
-        .title('Navigating')
-        .content('Inspect ' + person)
-        .ariaLabel('Person inspect demo')
-        .ok('Neat!')
-        .targetEvent(event)
-    );
+    // $mdDialog.show(
+      // $mdDialog.alert()
+        // .title('Navigating')
+        // .content('Inspect ' + person)
+        // .ariaLabel('Person inspect demo')
+        // .ok('Neat!')
+        // .targetEvent(event)
+    // );
   };
   $scope.navigateTo = function(to, event) {
     $mdDialog.show(
