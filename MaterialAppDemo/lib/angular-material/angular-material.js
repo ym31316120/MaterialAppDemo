@@ -3526,7 +3526,7 @@ angular.module('material.core')
     .directive('mdNoBar', attrNoDirective)
     .directive('mdNoStretch', attrNoDirective);
 
-var DURATION = 450;
+var DURATION = 200;
 
 /**
  * Directive used to add ripples to any element
@@ -3576,7 +3576,6 @@ function InkRippleCtrl ($scope, $element, rippleOptions, $window, $timeout, $mdU
   this.ripples    = [];
   this.timeout    = null; // Stores a reference to the most-recent ripple timeout
   this.lastRipple = null;
-
   $mdUtil.valueOnUse(this, 'container', this.createContainer);
   $mdUtil.valueOnUse(this, 'background', this.getColor, 0.5);
 
@@ -3747,6 +3746,7 @@ InkRippleCtrl.prototype.createRipple = function (left, top) {
   var x           = Math.max(Math.abs(width - left), left) * 2;
   var y           = Math.max(Math.abs(height - top), top) * 2;
   var size        = getSize(this.options.fitRipple, x, y);
+  
 
   ripple.css({
     left:            left + 'px',
@@ -3765,14 +3765,13 @@ InkRippleCtrl.prototype.createRipple = function (left, top) {
     ctrl.clearTimeout();
     if (!ctrl.mousedown) ctrl.fadeInComplete(ripple);
   }, DURATION * 0.35, false);
-
+  
   if (this.options.dimBackground) this.container.css({ backgroundColor: this.background });
   this.container.append(ripple);
   this.ripples.push(ripple);
   ripple.addClass('md-ripple-placed');
 
   this.$mdUtil.nextTick(function () {
-
     ripple.addClass('md-ripple-scaled md-ripple-active');
     ctrl.$timeout(function () {
       ctrl.clearRipples();
@@ -3803,10 +3802,14 @@ InkRippleCtrl.prototype.setColor = function (color) {
  */
 InkRippleCtrl.prototype.fadeInComplete = function (ripple) {
   if (this.lastRipple === ripple) {
-    if (!this.timeout && !this.mousedown) {
+
+    // if (!this.timeout && !this.mousedown) {
+    //if (!this.timeout ) {
+        
       this.removeRipple(ripple);
-    }
+   // }
   } else {
+     
     this.removeRipple(ripple);
   }
 };
@@ -5972,8 +5975,9 @@ function MdButtonDirective($mdButtonInkRipple, $mdTheming, $mdAria, $timeout) {
   function postLink(scope, element, attr) {
     var node = element[0];
     $mdTheming(element);
+    
     $mdButtonInkRipple.attach(scope, element);
-
+    
     var elementHasText = node.textContent.trim();
     if (!elementHasText) {
       $mdAria.expect(element, 'aria-label');
@@ -6011,6 +6015,7 @@ function MdButtonDirective($mdButtonInkRipple, $mdTheming, $mdAria, $timeout) {
       .on('blur', function(ev) {
         element.removeClass('md-focused');
       });
+     
   }
 
 }
@@ -11412,7 +11417,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
       var secondaryItem = tEl[0].querySelector('.md-secondary');
       var hasProxiedElement;
       var proxyElement;
-
+     
       tEl[0].setAttribute('role', 'listitem');
 
       if (tAttrs.ngClick || tAttrs.ngHref || tAttrs.href || tAttrs.uiSref || tAttrs.ngAttrUiSref) {
@@ -11464,6 +11469,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
               tEl[0].removeAttribute(attr);
             }
           });
+         
           container.children().eq(0).append(tEl.contents());
         }
 
@@ -11490,6 +11496,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
           tEl.addClass('md-with-secondary');
           tEl.append(secondaryItem);
         }
+        
       }
 
       function isProxiedElement(el) {
@@ -11499,14 +11506,14 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
       return postLink;
 
       function postLink($scope, $element, $attr, ctrl) {
+       
 
         var proxies    = [],
             firstChild = $element[0].firstElementChild,
             hasClick   = firstChild && hasClickEvent(firstChild);
 
-        computeProxies();
+        computeProxies();      
         computeClickable();
-
         if ($element.hasClass('md-proxy-focus') && proxies.length) {
           angular.forEach(proxies, function(proxy) {
             proxy = angular.element(proxy);
@@ -11527,7 +11534,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
             });
           });
         }
-
+        
         function hasClickEvent (element) {
           var attr = element.attributes;
           for (var i = 0; i < attr.length; i++) {
@@ -11550,7 +11557,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
           if (proxies.length || hasClick) {
             $element.addClass('md-clickable');
 
-            ctrl.attachRipple($scope, angular.element($element[0].querySelector('.md-no-style')));
+           // ctrl.attachRipple($scope, angular.element($element[0].querySelector('.md-no-style')));
           }
         }
 
@@ -11584,6 +11591,7 @@ function mdListItemDirective($mdAria, $mdConstant, $mdUtil, $timeout) {
             }
           });
         }
+      
       }
     }
   };
@@ -11600,7 +11608,7 @@ mdListItemDirective.$inject = ["$mdAria", "$mdConstant", "$mdUtil", "$timeout"];
 function MdListController($scope, $element, $mdListInkRipple) {
   var ctrl = this;
   ctrl.attachRipple = attachRipple;
-
+ 
   function attachRipple (scope, element) {
     var options = {};
     $mdListInkRipple.attach(scope, element, options);

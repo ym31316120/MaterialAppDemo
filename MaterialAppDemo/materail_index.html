@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html ng-app="myApp">
+<html >
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
@@ -25,39 +25,11 @@
 		</style>
 
 	</head>
-	<body layout="row" ng-cloak>
-		<div flex layout="column">
-
-			<md-toolbar>
-				<div class="md-toolbar-tools">
-					<h3>Angular Material</h3>
-					<span flex></span>
-					<md-button class="md-icon-button" aria-label="Settings">
-						<md-icon md-svg-icon="img/icons/menu.svg"></md-icon>
-					</md-button>
-				</div>
-			</md-toolbar>
-
-			<md-content flex id="content">
-
-				<md-list ng-controller="ListCtrl" ng-cloak>
-					<md-subheader class="md-no-sticky">
-						Material Angularjs UI组件使用及效果
-					</md-subheader>
-					 
-					<md-list-item ng-repeat="ui in uilist" ng-click="goToPerson(ui.name, $event)">
-						<img alt="{{ ui.name }}" ng-src="{{ui.img}}" class="md-avatar" />
-						<p>
-							{{ ui.name }}
-						</p>
-						<!-- <md-icon md-svg-icon="communication:messenger" ng-click="doSecondaryAction($event)" aria-label="Open Chat" class="md-secondary md-hue-3" ng-class="{'md-primary': person.newMessage}"></md-icon> -->
-						 <md-divider ></md-divider>
-					</md-list-item>
-					
-				</md-list>
-			</md-content>
-
+	<body ng-app="myApp">
+		<div ng-view layout="row" class="slide">
+			
 		</div>
+
 
 		<script src="lib/angularjs_1.4.7/angular.js"></script>
 		<script src="lib/angularjs_1.4.7/angular-route.js"></script>
