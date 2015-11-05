@@ -122,16 +122,16 @@
 
     //使用connect启动一个web服务器
     gulp.task('connect', function () {
-        return connect.server({
+        connect.server({
             root: [ paths.root ],
             livereload: true,
-            port:'3000'
+            port:'8899'
         });
     });
     //自动打开web首页地址
     gulp.task('open', function () {
         return gulp.src('./index.html')
-            .pipe(open({ uri: 'http://localhost:3000/index.html'}));
+            .pipe(open({ uri: 'http://localhost:8899/index.html'}));
     });
 
     gulp.task('server', [ 'watch', 'connect' ]);
