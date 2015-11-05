@@ -243,4 +243,7 @@ to {
     transform: translate3d(0, 56px, 0);
   }
 }
-
+.md-toast {
+  background-color: #B14141; }
+.md-toast > * {
+  font-weight: bolder; }
