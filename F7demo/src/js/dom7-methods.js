@@ -21,6 +21,11 @@ Dom7.prototype = {
         }
         return this;
     },
+    /**
+     * 通过调用标准API的classList获取当前元素的所有css样式属性值，并判断是否包含传递参数className的值
+     * @param className  CSS样式名称
+     * @returns {boolean}
+     */
     hasClass: function (className) {
         if (!this[0]) return false;
         else return this[0].classList.contains(className);
@@ -396,10 +401,6 @@ Dom7.prototype = {
         if (this[0]) return window.getComputedStyle(this[0], null);
         else return undefined;
     },
-    /*
-    CSS方法如果props是一个属性值则获取对应的值，如果是一个包含多个属性及值的对象则对元素进行css样式设置
-    如果传递了props和value两个值则把value值复制给props属性放到元素css样式中，同时返回对象
-     */
     /**
      * 如果props是一个属性名称，并且参数是一个，则获取对应的属性值；
      * 如果是一个包含多个属性及值的对象则对元素进行css样式设置
