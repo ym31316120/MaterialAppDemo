@@ -125,7 +125,7 @@ window.Framework7 = function (params) {
     }
 
     // DOM lib
-    var $ = new Dom7('<tr dege>');
+    var $ = Dom7;
 
     // Template7 lib
     //var t7 = Template7;
@@ -143,14 +143,14 @@ window.Framework7 = function (params) {
     console.log("framework7 init");
 
     // RTL
-    //app.rtl = $('body').css('direction') === 'rtl';
-    //if (app.rtl) $('html').attr('dir', 'rtl');
-    //
-    //// Overwrite statusbar overlay
-    //if (typeof app.params.statusbarOverlay !== 'undefined') {
-    //    if (app.params.statusbarOverlay) $('html').addClass('with-statusbar-overlay');
-    //    else $('html').removeClass('with-statusbar-overlay');
-    //}
+    app.rtl = $('body').css('direction') === 'rtl';
+    if (app.rtl) $('html').attr('dir', 'rtl');
 
-};
+    // 这是针对ios样式的手机状态栏覆盖功能，默认是undefined
+    if (typeof app.params.statusbarOverlay !== 'undefined') {
+        if (app.params.statusbarOverlay) $('html').addClass('with-statusbar-overlay');
+        else $('html').removeClass('with-statusbar-overlay');
+    }
+
+
     

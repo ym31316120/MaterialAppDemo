@@ -34,6 +34,14 @@ Dom7.prototype = {
         }
         return this;
     },
+    /**
+     * 如果传递的参数只有一个，并且是字符串，并且当前是一个元素则获取这个元素的属性对应数值并返回，否则返回undefined
+     * 如果传递的参数是两个，则根据value直接对元素进行属性赋值
+     * 如果attrs传递的是一个对象，则循环进行赋值
+     * @param attrs  元素的属性名称
+     * @param value  元素的属性值
+     * @returns {*}
+     */
     attr: function (attrs, value) {
         if (arguments.length === 1 && typeof attrs === 'string') {
             // Get attr
@@ -388,6 +396,18 @@ Dom7.prototype = {
         if (this[0]) return window.getComputedStyle(this[0], null);
         else return undefined;
     },
+    /*
+    CSS方法如果props是一个属性值则获取对应的值，如果是一个包含多个属性及值的对象则对元素进行css样式设置
+    如果传递了props和value两个值则把value值复制给props属性放到元素css样式中，同时返回对象
+     */
+    /**
+     * 如果props是一个属性名称，并且参数是一个，则获取对应的属性值；
+     * 如果是一个包含多个属性及值的对象则对元素进行css样式设置
+     * 如果传递了props和value两个值则把value值复制给props属性放到元素css样式中，同时返回对象
+     * @param props  CSS样式属性名称
+     * @param value  CSS样式属性值
+     * @returns {*}
+     */
     css: function (props, value) {
         var i;
         if (arguments.length === 1) {

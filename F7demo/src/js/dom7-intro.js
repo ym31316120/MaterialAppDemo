@@ -47,6 +47,7 @@ var Dom7 = (function () {
                     }
                     else {
                         // Other selectors
+                        //querySelectorAll获取document下所有selector元素
                         els = (context || document).querySelectorAll(selector);
                     }
                     for (i = 0; i < els.length; i++) {
