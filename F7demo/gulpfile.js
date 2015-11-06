@@ -11,6 +11,8 @@
     var jshint = require('gulp-jshint'); //js代码校验的组件
     var concat = require('gulp-concat'); //合并js文件的组件
     var open = require('gulp-open');
+    var tap = require('gulp-tap'); //感觉这个插件是进行文件循环处理的
+    var fs = require('fs'); //不清楚这个插件，貌似是读取文件内容的
     //var minifyCSS = require('gulp-minify-css'); //压缩css文件的组件
     //定义本项目将要用的所有路径
     var paths = {
@@ -34,6 +36,16 @@
     var f7 = {
         filename: 'hy-f7',
         jsRoot: 'src/js/*.js',
+        jsFiles: [
+            'src/js/wrap-start.js',
+            'src/js/f7-intro.js',
+            'src/js/dom7-intro.js',
+            'src/js/dom7-methods.js',
+            'src/js/dom7-ajax.js',
+            'src/js/dom7-utils.js',
+            'src/js/dom7-outro.js',
+            'src/js/wrap-end.js'
+        ],
         date:{
             year: new Date().getFullYear(),
             month: ('January February March April May June July August September October November December').split(' ')[new Date().getMonth()],
@@ -55,14 +67,46 @@
             });
     });
 
+    /*
+    给要合并的js文件增加段落缩进
+     */
+    function addJSIndent (file, t) {
+        var addIndent = '        ';
+        var filename = file.path.split("src\\js\\")[1];
+        if (filename === 'wrap-start.js' || filename === 'wrap-end.js') {
+            addIndent = '';
+        }
+        var add4spaces = ('f7-intro.js f7-outro.js proto-device.js proto-plugins.js proto-support.js dom7-intro.js dom7-outro.js template7.js swiper.js').split(' ');
+        if (add4spaces.indexOf(filename) >= 0) {
+            addIndent = '    ';
+        }
+        var add8spaces = ('dom7-methods.js dom7-ajax.js dom7-utils.js').split(' ');
+        if (add8spaces.indexOf(filename) >= 0) {
+            addIndent = '        ';
+        }
+        if (addIndent !== '') {
+            var fileLines = fs.readFileSync(file.path).toString().split('\n');
+            var newFileContents = '';
+            for (var i = 0; i < fileLines.length; i++) {
+                newFileContents += addIndent + fileLines[i] + (i === fileLines.length ? '' : '\n');
+            }
+            file.contents = new Buffer(newFileContents);
+        }
+    }
+
     //创建一个scripts任务，进行js的校验和合并
     //gulp.dest()能被 pipe 进来，并且将会写文件。并且重新输出（emits）所有数据，
     // 因此你可以将它 pipe 到多个文件夹。如果某文件夹不存在，将会自动创建它
     gulp.task('scripts',function(cb){
         // 从磁盘中读取库文件
-        gulp.src(f7.jsRoot)
+        gulp.src(f7.jsFiles)
+            .pipe(tap(function(file,t){
+                addJSIndent(file,t);
+            }))
             .pipe(concat(f7.filename+'.js')) // 将所有库文件拼接到一起
             .pipe(gulp.dest(paths.build.scripts))//将合并后的文件输出到pahts.build.scripts目录中
+            .pipe(jshint())
+            .pipe(jshint.reporter('default'))
             .pipe(rename(f7.filename+'.min.js')) //对文件进行重命名
             .pipe(uglify()) //对其进行压缩处理
             .pipe(gulp.dest(paths.build.scripts))
@@ -117,7 +161,7 @@
         gulp.watch(paths.source.styles.ios,['styles-ios']); //如果ios的less文件变化则启动styles-ios任务
         gulp.watch(paths.source.styles.material,['styles-material']); //如果material的less文件变化则启动styles-material任务
 
-        gulp.watch(paths.htmls,['html']); //如果html页面发生变化则调用html任务进行重加载
+        //gulp.watch(paths.htmls,['html']); //如果html页面发生变化则调用html任务进行重加载
     });
 
     //使用connect启动一个web服务器
@@ -134,7 +178,7 @@
             .pipe(open({ uri: 'http://localhost:8899/index.html'}));
     });
 
-    gulp.task('server', [ 'watch', 'connect' ]);
+    gulp.task('server', [ 'watch']);
 
     gulp.task('default', [ 'server' ]);
 
