@@ -13,7 +13,7 @@
      */
 
     window.Framework7 = function (params) {
-        //定义一个app对象,并赋予this，即app对象是整个Framework7本身，可以调用原型方法
+        //定义一个app对象,并赋予this，即app对象是整个Framework7本身，这样可以调用原型方法
         var app = this;
 
         //定义该框架的版本
@@ -26,6 +26,12 @@
             cacheIgnoreGetParameters: false, /** 缓存时是否忽略参数，true则忽略参数 */
             cacheDuration: 1000*60*10,  /** 配置缓存的持续时间，默认是10分钟 */
         };
+
+        //获取用户的配置参数并添加到参数对象中，如果参数名一样则覆盖，不存在则创建
+        for (var param in params){
+            app.params[param] = params[param];
+        }
+
 
     };
 
