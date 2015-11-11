@@ -3,3 +3,7 @@
  */
 
 var app  = new Framework7();
+
+var viewmain = app.addView('.view-main',{
+    domCache:true,
+});

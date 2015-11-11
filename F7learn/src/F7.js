@@ -26,9 +26,22 @@
             cacheIgnoreGetParameters: false, /** 缓存时是否忽略参数，true则忽略参数 */
             cacheDuration: 1000 * 60 * 10, /** 配置缓存的持续时间，默认是10分钟 */
 
+            allowDuplicateUrls: false, /**设置是否允许在当前active页面中对同一个地址进行加载*/
+
+            swipeBackPage: false, /** 默认滑动返回效果*/
+            swipeBackPageThreshold: 0,
+            swipeBackPageActiveArea: 30,
+            swipeBackPageAnimateShadow: true,
+            swipeBackPageAnimateOpacity: true,
 
             externalLinks: '.external', /** Css 选择器，控制是否是外部链接，将取消框架默认的Ajax页面加载效果*/
 
+            // 默认视图定义
+            viewClass: 'view',
+            viewMainClass: 'view-main',
+            viewsClass: 'views',
+
+            material: false,
 
             init: true, /** 默认自动开始初始化方法*/
         };
@@ -57,6 +70,221 @@
         //处理RTL页面由右向左的排版格式，如果direction设置为rtl，则进行属性设置
         app.rtl = $('body').css('direction') === 'rtl';
         if (app.rtl) $('html').attr('dir', 'rtl');
+
+
+        /*=======================================
+         *********** Views ***********************
+         ========================================= */
+        app.views = [];
+        var View = function (selector, params) {
+            var defaults = {
+                dynamicNavbar: false,   //动态导航参数属性
+                domCache: false,        //Dom缓存,true则把上一页都放到缓存中
+                linksView: undefined,   //View选择器，默认所有页面都加载到当前View里，这里可以指定一个其他的View
+                reloadPages: false,
+                uniqueHistory: app.params.uniqueHistory,
+                uniqueHistoryIgnoreGetParameters: app.params.uniqueHistoryIgnoreGetParameters,
+                allowDuplicateUrls: app.params.allowDuplicateUrls,
+                swipeBackPage: app.params.swipeBackPage,
+                swipeBackPageAnimateShadow: app.params.swipeBackPageAnimateShadow,
+                swipeBackPageAnimateOpacity: app.params.swipeBackPageAnimateOpacity,
+                swipeBackPageActiveArea: app.params.swipeBackPageActiveArea,
+                swipeBackPageThreshold: app.params.swipeBackPageThreshold,
+                animatePages: app.params.animatePages,
+                preloadPreviousPage: app.params.preloadPreviousPage,
+            };
+
+            var i;
+            params = params || {};
+            //Android主题不支持动态导航，需要设置为false
+            if (params.dynamicNavbar && app.params.material) params.dynamicNavbar = false;
+
+            for (var def in defaults) {
+                if (typeof params[def] === 'undefined') {
+                    params[def] = defaults[def];
+                }
+            }
+
+            var view = this;
+            view.params = params;
+            view.selector = selector;
+            var container = $(selector);
+            view.container = container[0];
+
+            if (typeof selector !== 'string') {
+                //如果selector是个Element或者Dom7对象
+                selector = (container.attr('id') ? "#" + container.attr('id') : '') +
+                    (container.attr('class') ? '.' + container.attr('class').replace(/ /g, '.').replace('.active', '') : '');
+                view.selector = selector;
+            }
+            //判断该视图是否是主视图
+            view.main = container.hasClass(app.params.viewMainClass);
+            //定义内容缓存和页面缓存
+            view.contentCache = {};
+            view.pageCache = {};
+            //保存视图到元素中以方便访问
+            container[0].f7View = view;
+
+            view.pagesContainer = container.find('.pages')[0];
+            view.initialPages = [];
+            view.initialPagesUrl = [];
+            view.initialNavbars = [];
+            if (view.params.domCache) {
+                var initialPages = container.find('.page');
+                for (i = 0; i < initialPages.length; i++) {
+                    view.initialPages.push(initialPages[i]);
+                    view.initialPagesUrl.push('#' + initialPages.eq(i).attr('data-page'));
+                }
+                if (view.params.dynamicNavbar) {
+                    var initialNavbars = container.find('.navbar-inner');
+                    for (i = 0; i < initialNavbars.length; i++) {
+                        view.initialNavbars.push(initialNavbars[i]);
+                    }
+                }
+            }
+
+            view.allowPageChange = true;  //目前不清楚这个变量的作用
+
+            var docLocation = document.location.href;
+
+            //没有写完
+            view.history = [];
+            var viewURL = docLocation;
+
+
+            //激活页面视图,如果找到多个page页面则默认获取最后一个页面作为当前页面
+            var currentPage, currentPageData;
+            if (!view.activePage) {
+                currentPage = $(view.pagesContainer).find('.page-on-center');
+                if (currentPage.length === 0) {
+                    currentPage = $(view.pagesContainer).find('.page:not(.cached)');
+                    currentPage = currentPage.eq(currentPage.length - 1);
+                }
+                if (currentPage.length > 0) {
+                    currentPageData = currentPage[0].f7PageData;
+                }
+            }
+
+            if (view.params.domCache && currentPage) {
+                view.url = container.attr('data-url') || view.params.url || '#' + currentPage.attr('data-page');
+                view.pageCache[view.url] = currentPage.attr('data-page');
+            } else {
+                view.url = container.attr('data-url') || view.params.url || viewURL;
+            }
+
+            //更新当前页面数据没有写
+
+
+            //存储历史url
+            if (view.url) {
+                view.history.push(view.url);
+            }
+
+            //把视图添加到APP应用中
+            app.views.push(view);
+            if (view.main) app.mainView = view;
+
+            //视图路由功能
+            view.router = {
+                load: function (options) {
+                    app.router.load(view, options);
+                },
+                back: function (options) {
+                    app.router.back(view, options);
+                },
+            };
+
+
+            //返回视图
+            return view;
+
+        };
+
+        app.addView = function (selector, params) {
+            return new View(selector, params);
+        };
+
+
+        /*==================================
+         ****** 导航和路由功能***************
+         ==================================*/
+
+        app.router = {
+            //临时存放页面内容的DIV标签
+            temporaryDom: document.createElement('div'),
+            preroute: function (view, options) {
+                if ((app.params.preroute && app.params.preroute(view, options) === false) || (view && view.params.preroute && view.params.preroute(view, options) === false)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+
+
+        };
+
+
+        app.router.load = function (view, options) {
+            if (app.router.preroute(view, options)) {
+                //如果使用自定义的路由则返回false
+                return false;
+            }
+            options = options || {};
+            var url = options.url;
+            var content = options.content;  //默认link传递的参数里没有content这一个属性
+            var pageName = options.pageName;
+            if (pageName) {
+                if (pageName.indexOf('?') > 0) {
+                    //判断pageName里是否有传递参数，如果有则进行拆分，并把参数放到query里，pageName只保留具体的Name
+                    options.query = $.parseUrlQuery(pageName);
+                    options.pageName = pageName = pageName.split('?')[0];
+                }
+            }
+
+            var template = options.template; //默认link传递的参数里没有template这一个属性
+            if (view.params.reloadPages === true) options.reload = true;
+
+            if (!view.allowPageChange) return false; //如果视图不允许页面变化则直接返回
+            //如果跳转的url地址与当前视图地址一样，同时参数中reload为不允许重载，同时视图参数中也不允许在同一个页面在当前active加载则直接返回
+            if (url && view.url === url && !options.reload && !view.params.allowDuplicateUrls) return false;
+
+            view.allowPageChange = false;  //这里为什么要把这个变量给赋值成false呢？寓意何在
+
+            if (app.xhr && view.xhr && view.xhr === app.xhr) {
+                app.xhr.abort(); //取消Ajax请求
+                app.xhr = false;
+            }
+
+            function proceed(content) {
+                //app.router.preprocess(view, content, url, function (content) {
+                //    options.content = content;
+                //    app.router._load(view, options);
+                //});
+            }
+
+            if (content || pageName) {
+                proceed(content);
+                return;
+            }
+            else if (template) {
+                //app.router._load(view, options);
+                return;
+            }
+
+            if (!options.url || options.url === '#') {
+                view.allowPageChange = true;
+                return;
+            }
+            app.get(options.url, view, options.ignoreCache, function (content, error) {
+                if (error) {
+                    view.allowPageChange = true;
+                    return;
+                }
+                proceed(content);
+            });
+
+
+        };
 
 
         /**
@@ -89,15 +317,125 @@
                 }
                 var validUrl = url && url.length > 0 && url !== "#" && !isTabLink;
                 var template = clickedData.template;
-                console.log(clickedData);
-                if(validUrl || clicked.hasClass('back') || template){
-                    console.log('--------');
+                if (validUrl || clicked.hasClass('back') || template) {
+                    var view;
+                    if (clickedData.view) {
+                        view = $(clickedData.view)[0].f7View;
+                    } else {
+                        view = clicked.parents('.' + app.params.viewClass)[0] && clicked.parents('.' + app.params.viewClass)[0].f7View;
+                    }
+                    if (!view) {
+                        if (app.mainView) view = app.mainView;
+                    }
+                    if (!view) return;
+
+                    var pageName;
+                    if (!template) {
+                        if (url.indexOf('#') === 0 && url !== "#") {
+                            if (view.params.domCache) {
+                                pageName = url.split('#')[1];
+                                url = undefined;
+                            } else return;
+                        }
+                        if (url === '#' && !clicked.hasClass('back')) return;
+                    } else {
+                        url = undefined;
+                    }
                 }
 
+                var animatePages;
+                if (typeof clickedData.animatePages !== 'undefined') {
+                    animatePages = clickedData.animatePages;
+                } else {
+                    if (clicked.hasClass('with-animation')) animatePages = true;
+                    if (clicked.hasClass('no-animation')) animatePages = false;
+                }
 
+                var options = {
+                    animatePages: animatePages,
+                    ignoreCache: clickedData.ignoreCache,
+                    force: clickedData.force,
+                    reload: clickedData.reload,
+                    reloadPrevious: clickedData.reloadPrevious,
+                    pageName: pageName,
+                    pushState: clickedData.pushState,
+                    url: url,
+                };
+
+
+                if (clicked.hasClass('back')) view.router.back(options);
+                else view.router.load(options);
             }
 
             $(document).on('click', 'a', handleClicks);
+
+        };
+
+
+        /*===============================
+         **********XHR*******************
+         ===============================*/
+        app.cache = [];
+        app.removeFromCache = function (url) {
+            var index = false;
+            for (var i = 0; i < app.cache.length; i++) {
+                if (app.cache[i].url === url)index = i;
+            }
+            //splice从数组中删除或者添加项目，第一个参数index是要删除和添加的位置，第二个参数是要删除的数量，0为不删除，第三个参数是要添加的项目
+            if (index != false) app.cache.splice(index, 1);
+        };
+        app.xhr = false;
+        app.get = function (url, view, ignoreCache, callback) {
+            var _url = url;
+            if (app.params.cacheIgnoreGetParameters && url.indexOf('?') >= 0) {
+                _url = url.split('?')[0];
+            }
+            if (app.params.cache && !ignoreCache && url.indexOf('nocache') < 0 && app.params.cacheIgnore.indexOf(_url) < 0) {
+                for (var i = 0; i < app.cache.length; i++) {
+                    if (app.cache[i].url === url) {
+                        //判断缓存是否已经超时
+                        if ((new Date()).getTime() - app.cache[i].time < app.params.cacheDuration) {
+                            console.log('缓存没有超时，从缓存中获取页面内容');
+                            callback(app.cache[i].content);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            //下面调用Ajax进行数据获取
+            console.log("app.get=="+url);
+            app.xhr = $.ajax({
+                url: url,
+                method: 'GET',
+                beforeSend: app.params.onAjaxStart,
+                complete:function(xhr){
+                    console.log("complete="+xhr.status);
+                    if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+                        if (app.params.cache && !ignoreCache) {
+                            app.removeFromCache(_url);
+                            app.cache.push({
+                                url: _url,
+                                time: (new Date()).getTime(),
+                                content: xhr.responseText
+                            });
+                        }
+                        callback(xhr.responseText, false);
+                    }
+                    else {
+                        callback(xhr.responseText, true);
+                    }
+                    if (app.params.onAjaxComplete) app.params.onAjaxComplete(xhr);
+                },
+                error: function(xhr){
+                    callback(xhr.responseText, true);
+                    if (app.params.onAjaxError) app.params.onAjaxError(xhr);
+                }
+            });
+
+            if (view) view.xhr = app.xhr;
+
+            return app.xhr;
 
         };
 
@@ -233,37 +571,7 @@ var Dom7 = (function () {
                 return this;
             }
         },
-        /**
-         * 获取元素的所有data属性keyvalue的对象
-         * @returns {*}
-         */
-        getDataset: function () {
-            var el = this[0];
-            if (el) {
-                var dataset = {};
-                if (el.dataset) {
-                    for (var datakey in el.dataset) {
-                        dataset[datakey] = el.dataset[datakey];
-                    }
-                } else {
-                    for (var i = 0; i < el.attributes.length; i++) {
-                        var attr = el.attributes[i];
-                        if (attr.name.indexOf('data-') >= 0) {
-                            dataset[$.toCamelCase(attr.name.split('data-')[1])] = attr.value;
-                        }
-                    }
-                }
-                //对data属性值的特殊字符串进行转换，数字字符串转换成数字，true和false转换成boolean型值
-                for (var key in dataset) {
-                    if (dataset[key] === 'false') dataset[key] = false;
-                    else if (dataset[key] === 'true') dateset[key] = true;
-                    else if (parseFloat(dataset[key]) === dataset[key] * 1) dataset[key] = dataset[key] * 1;
-                }
-                return dataset;
-            } else {
-                return undefined;
-            }
-        },
+
         /**
          * 传递props字符串一个参数则获取默认第一个元素的css样式对应的值
          * 传递props样式对象，则根据对象对所有的元素进行CSS样式设置
@@ -296,6 +604,71 @@ var Dom7 = (function () {
                 return this;
             }
             return this;
+        },
+        /**
+         * 按照index获取Dom7中的新的Dom7对象
+         * @param index
+         * @returns {Dom7}
+         */
+        eq: function (index) {
+            if (typeof index === 'undefined') return this;
+            var length = this.length;
+            var returnIndex;
+            if (index > length - 1) {
+                return new Dom7([]);
+            }
+            if (index < 0) {
+                returnIndex = length + index;
+                if (returnIndex < 0) return new Dom7([]);
+                else return new Dom7([this[returnIndex]]);
+            }
+            return new Dom7([this[index]]);
+        },
+        /**
+         * 通过CSS选择器寻找到元素中包含的所有匹配的元素并返回Dom7对象
+         * @param selector
+         * @returns {Dom7}
+         */
+        find: function (selector) {
+            var foundElement = [];
+            for (var i = 0; i < this.length; i++) {
+                var found = this[i].querySelectorAll(selector);
+                for (var j = 0; j < found.length; j++) {
+                    foundElement.push(found[j]);
+                }
+            }
+            return new Dom7(foundElement);
+        },
+        /**
+         * 获取元素的所有data属性keyvalue的对象
+         * @returns {*}
+         */
+        getDataset: function () {
+            var el = this[0];
+            if (el) {
+                var dataset = {};
+                if (el.dataset) {
+                    for (var datakey in el.dataset) {
+                        dataset[datakey] = el.dataset[datakey];
+                    }
+                } else {
+                    for (var i = 0; i < el.attributes.length; i++) {
+                        var attr = el.attributes[i];
+                        if (attr.name.indexOf('data-') >= 0) {
+                            dataset[$.toCamelCase(attr.name.split('data-')[1])] = attr.value;
+                        }
+                    }
+                }
+                //对data属性值的特殊字符串进行转换，数字字符串转换成数字，true和false转换成boolean型值
+                for (var key in dataset) {
+                    if (dataset[key] === 'false') dataset[key] = false;
+                    else if (dataset[key] === 'true') dateset[key] = true;
+                    else if (parseFloat(dataset[key]) === dataset[key] * 1) dataset[key] = dataset[key] * 1;
+                }
+                return dataset;
+            } else {
+                return undefined;
+            }
         },
         /**
          * 判断元素是否在class中包含参数值
@@ -408,12 +781,403 @@ var Dom7 = (function () {
             }
             return $($.unique(parents));
         },
+        /**
+         * 触发选中元素上的事件，指定所有的事件回调函数
+         * @param eventName
+         * @param eventData
+         * @returns {Dom7}
+         */
+        trigger: function (eventName, eventData) {
+            for (var i = 0; i < this.length; i++) {
+                var evt;
+                try {
+                    evt = new CustomEvent(eventName, {detail: eventData, bubbles: true, cancelable: true});
+                }
+                catch (e) {
+                    evt = document.createEvent('Event');
+                    evt.initEvent(eventName, true, true);
+                    evt.detail = eventData;
+                }
+                this[i].dispatchEvent(evt);
+            }
+            return this;
+        },
     };
 
 
     /**------------------------
      * $的自身方法
      -------------------------*/
+    var globalAjaxOptions = {};
+    var _jsonpRequests = 0;
+    /**
+     * 把参数中的内容放到globalAjaxOptions全局变量中
+     * @param options
+     */
+    $.ajaxSetup = function (options) {
+        if (options.type) options.method = options.type;
+        $.each(options, function (optionName, optionValue) {
+            globalAjaxOptions[optionName] = optionValue;
+        });
+    };
+    $.ajax = function (options) {
+        var defaults = {
+            method: 'GET',
+            data: false,
+            async: true,   //异步加载
+            cache: true,
+            user: '',
+            password: '',
+            headers: {},
+            xhrFields: {},
+            statusCode: {},
+            processData: true,
+            dataType: 'text',
+            contentType: 'application/x-www-form-urlencoded',
+            timeout: 0,
+        };
+        var callbacks = ['beforeSend', 'error', 'complete', 'success', 'statusCode'];
+        if (options.type) options.method = options.type;
+
+        $.each(globalAjaxOptions, function (optionName, optionValue) {
+            if (callbacks.indexOf(optionName) < 0) defaults[optionName] = optionValue;
+        });
+
+        // Function to run XHR callbacks and events
+        function fireAjaxCallback(eventName, eventData, callbackName) {
+            var a = arguments;
+            if (eventName) $(document).trigger(eventName, eventData);
+            if (callbackName) {
+                // Global callback
+                if (callbackName in globalAjaxOptions) globalAjaxOptions[callbackName](a[3], a[4], a[5], a[6]);
+                // Options callback
+                if (options[callbackName]) options[callbackName](a[3], a[4], a[5], a[6]);
+            }
+        }
+
+        //把默认参数放到options对象中
+        $.each(defaults, function (optionName, optionValue) {
+            if (!(optionName in options)) options[optionName] = optionValue;
+        });
+        //如果没有url则默认赋值
+        if (!options.url) {
+            options.url = window.location.toString();
+        }
+
+        var paramsPrefix = options.url.indexOf('?') >= 0 ? '&' : '?';
+        var _method = options.method.toUpperCase();
+        //修改数据地址
+        if ((_method === 'GET' || _method === 'HEAD' || _method === 'OPTIONS' || _method === 'DELETE') && options.data) {
+            var stringData;
+            if (typeof options.data === 'string') {
+                // Should be key=value string
+                if (options.data.indexOf('?') > 0)stringData = options.data.split('?')[1];
+                else stringData = options.data;
+            } else {
+                // Should be key=value object
+                stringData = $.serializeObject(options.data);
+            }
+            if (stringData.length) {
+                options.url += paramsPrefix + stringData;
+                if (paramsPrefix === '?') paramsPrefix = '&';
+            }
+        }
+
+        //JSONP
+        if (options.dataType === 'json' && options.url.indexOf('callback=') >= 0) {
+            var callbackName = 'f7jsonp_' + Date.now() + (_jsonpRequests++);
+            var abortTimeout;
+            var callbackSplit = options.url.split('callback=');
+            var requestUrl = callbackSplit[0] + 'callback=' + callbackName;
+            if (callbackSplit[1].indexOf('&') >= 0) {
+                var addVars = callbackSplit[1].split('&').filter(function (el) {
+                    return el.indexOf('=') > 0;
+                }).join('&');
+                if (addVars.length > 0) requestUrl += '&' + addVars;
+            }
+
+            // Create script
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.onerror = function () {
+                clearTimeout(abortTimeout);
+                fireAjaxCallback(undefined, undefined, 'error', null, 'scripterror');
+            };
+            script.src = requestUrl;
+
+            // Handler
+            window[callbackName] = function (data) {
+                clearTimeout(abortTimeout);
+                fireAjaxCallback(undefined, undefined, 'success', data);
+                script.parentNode.removeChild(script);
+                script = null;
+                delete window[callbackName];
+            };
+            document.querySelector('head').appendChild(script);
+
+            if (options.timeout > 0) {
+                abortTimeout = setTimeout(function () {
+                    script.parentNode.removeChild(script);
+                    script = null;
+                    fireAjaxCallback(undefined, undefined, 'error', null, 'timeout');
+                }, options.timeout);
+            }
+            return;
+        }
+        // Cache for GET/HEAD requests
+        if (_method === 'GET' || _method === 'HEAD' || _method === 'OPTIONS' || _method === 'DELETE') {
+            if (options.cache === false) {
+                options.url += (paramsPrefix + '_nocache=' + Date.now());
+            }
+        }
+
+        console.log(options);
+
+        // Create XHR
+        var xhr = new XMLHttpRequest();
+
+        // Save Request URL
+        xhr.requestUrl = options.url;
+        xhr.requestParameters = options;
+
+        // Open XHR
+        //3.设置连接信息
+        //初始化HTTP请求参数，但是并不发送请求。
+        //第一个参数连接方式，第二是url地址,第三个true是异步连接，默认是异步
+        xhr.open(_method, options.url, options.async, options.user, options.password);
+
+        // 如果是POST则需要自己创建http的请求头内容
+        var postData = null;
+
+        if ((_method === 'POST' || _method === 'PUT' || _method === 'PATCH') && options.data) {
+            if (options.processData) {
+                var postDataInstances = [ArrayBuffer, Blob, Document, FormData];
+                // Post Data
+                if (postDataInstances.indexOf(options.data.constructor) >= 0) {
+                    postData = options.data;
+                }
+                else {
+                    // POST Headers
+                    var boundary = '---------------------------' + Date.now().toString(16);
+
+                    if (options.contentType === 'multipart\/form-data') {
+                        xhr.setRequestHeader('Content-Type', 'multipart\/form-data; boundary=' + boundary);
+                    }
+                    else {
+                        xhr.setRequestHeader('Content-Type', options.contentType);
+                    }
+                    postData = '';
+                    var _data = $.serializeObject(options.data);
+                    if (options.contentType === 'multipart\/form-data') {
+                        boundary = '---------------------------' + Date.now().toString(16);
+                        _data = _data.split('&');
+                        var _newData = [];
+                        for (var i = 0; i < _data.length; i++) {
+                            _newData.push('Content-Disposition: form-data; name="' + _data[i].split('=')[0] + '"\r\n\r\n' + _data[i].split('=')[1] + '\r\n');
+                        }
+                        postData = '--' + boundary + '\r\n' + _newData.join('--' + boundary + '\r\n') + '--' + boundary + '--\r\n';
+                    }
+                    else {
+                        postData = options.contentType === 'application/x-www-form-urlencoded' ? _data : _data.replace(/&/g, '\r\n');
+                    }
+                }
+            }
+            else {
+                postData = options.data;
+            }
+
+        }
+
+        //post需要自己设置http的请求头
+        //xmlhttp.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+        if (options.headers) {
+            $.each(options.headers, function (headerName, headerCallback) {
+                xhr.setRequestHeader(headerName, headerCallback);
+            });
+        }
+
+        // Check for crossDomain
+        if (typeof options.crossDomain === 'undefined') {
+            options.crossDomain = /^([\w-]+:)?\/\/([^\/]+)/.test(options.url) && RegExp.$2 !== window.location.host;
+        }
+
+        if (!options.crossDomain) {
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        }
+
+        if (options.xhrFields) {
+            $.each(options.xhrFields, function (fieldName, fieldValue) {
+                xhr[fieldName] = fieldValue;
+            });
+        }
+
+        var xhrTimeout;
+        // Handle XHR
+        xhr.onload = function (e) {
+            console.log("xhr.load");
+            if (xhrTimeout) clearTimeout(xhrTimeout);
+            if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+                var responseData;
+                if (options.dataType === 'json') {
+                    try {
+                        responseData = JSON.parse(xhr.responseText);
+                        fireAjaxCallback('ajaxSuccess', {xhr: xhr}, 'success', responseData, xhr.status, xhr);
+                    }
+                    catch (err) {
+                        fireAjaxCallback('ajaxError', {xhr: xhr, parseerror: true}, 'error', xhr, 'parseerror');
+                    }
+                }
+                else {
+                    responseData = xhr.responseType === 'text' || xhr.responseType === '' ? xhr.responseText : xhr.response;
+                    fireAjaxCallback('ajaxSuccess', {xhr: xhr}, 'success', responseData, xhr.status, xhr);
+                }
+            }
+            else {
+                fireAjaxCallback('ajaxError', {xhr: xhr}, 'error', xhr, xhr.status);
+            }
+            if (options.statusCode) {
+                if (globalAjaxOptions.statusCode && globalAjaxOptions.statusCode[xhr.status]) globalAjaxOptions.statusCode[xhr.status](xhr);
+                if (options.statusCode[xhr.status]) options.statusCode[xhr.status](xhr);
+            }
+            fireAjaxCallback('ajaxComplete', {xhr: xhr}, 'complete', xhr, xhr.status);
+        };
+
+        xhr.onerror = function (e) {
+            if (xhrTimeout) clearTimeout(xhrTimeout);
+            fireAjaxCallback('ajaxError', {xhr: xhr}, 'error', xhr, xhr.status);
+        };
+
+        // Ajax start callback
+        fireAjaxCallback('ajaxStart', {xhr: xhr}, 'start', xhr);
+        fireAjaxCallback(undefined, undefined, 'beforeSend', xhr);
+
+
+        // Send XHR
+        console.log("before send");
+        xhr.send(postData);
+        console.log("after send");
+        // Timeout
+        if (options.timeout > 0) {
+            xhr.onabort = function () {
+                if (xhrTimeout) clearTimeout(xhrTimeout);
+            };
+            xhrTimeout = setTimeout(function () {
+                xhr.abort();
+                fireAjaxCallback('ajaxError', {xhr: xhr, timeout: true}, 'error', xhr, 'timeout');
+                fireAjaxCallback('ajaxComplete', {xhr: xhr, timeout: true}, 'complete', xhr, 'timeout');
+            }, options.timeout);
+        }
+
+        // Return XHR object
+        return xhr;
+
+    };
+    /**
+     * 循环数组内容，并通过callback回调函数分别对数组内容进行处理
+     * @param obj
+     * @param callback
+     */
+    $.each = function (obj, callback) {
+        //如果obj不是对象则返回，如果callback没有定义则返回
+        if (typeof obj !== 'object') return;
+        if (!callback) return;
+        var i, prop;
+        if ($.isArray(obj) || obj instanceof  Dom7) {
+            //如果obj是数组或者Dom7对象则执行下列代码
+            for (i = 0; i < obj.length; i++) {
+                callback(i, obj[i]);
+            }
+        } else {
+            for (prop in obj) {
+                if (obj.hasOwnProperty(prop)) { //hasOwnProperty：是用来判断一个对象是否有你给出名称的属性或对象
+                    callback(prop, obj[prop]);
+                }
+            }
+        }
+    };
+    /**
+     * 判断参数是否数组对象
+     * @param arr
+     * @returns {boolean}
+     */
+    $.isArray = function (arr) {
+        if (Object.prototype.toString.apply(arr) === '[object Array]') return true;
+        else return false;
+    };
+    /**
+     * 处理具有参数的url字符串，拆分参数并返回query对象
+     * @param url
+     * @returns {{}}
+     */
+    $.parseUrlQuery = function (url) {
+        var query = {}, i, params, param;
+        if (url.indexOf('?') >= 0) url = url.split('?')[1];
+        else return query;
+        params = url.split('&');
+        for (i = 0; i < params.length; i++) {
+            param = params[i].split('=');
+            query[param[0]] = param[1];
+        }
+        return query;
+    };
+    $.serializeObject = $.param = function (obj, parents) {
+        if (typeof obj === 'string') return obj;
+        var resultArray = [];
+        var separator = '&';
+        parents = parents || [];
+        var newParents;
+
+        function var_name(name) {
+            //encodeURIComponent() 函数可把字符串作为 URI 组件进行编码。
+            if (parents.length > 0) {
+                var _parents = '';
+                for (var j = 0; j < parents.length; j++) {
+                    if (j === 0) _parents += parents[j];
+                    else _parents += '[' + encodeURIComponent(parents[j]) + ']';
+                }
+                return _parents + '[' + encodeURIComponent(name) + ']';
+            }
+            else {
+                return encodeURIComponent(name);
+            }
+        }
+
+        function var_value(value) {
+            return encodeURIComponent(value);
+        }
+
+        for (var prop in obj) {
+            if (obj.hasOwnProperty(prop)) {
+                var toPush;
+                if ($.isArray(obj[prop])) {
+                    toPush = [];
+                    for (var i = 0; i < obj[prop].length; i++) {
+                        if (!$.isArray(obj[prop][i]) && typeof obj[prop][i] === 'object') {
+                            newParents = parents.slice(); //把parents的所有元素都返回
+                            newParents.push(prop);
+                            newParents.push(i + '');
+                            toPush.push($.serializeObject(obj[prop][i], newParents));
+                        } else {
+                            toPush.push(var_name(prop) + '[' + i + ']=' + var_value(obj[prop][i]));
+                        }
+                    }
+                    if (toPush.length > 0) resultArray.push(toPush.join(separator));
+                }
+                else if (typeof obj[prop] === 'object') {
+                    // Object, convert to named array
+                    newParents = parents.slice();
+                    newParents.push(prop);
+                    toPush = $.serializeObject(obj[prop], newParents);
+                    if (toPush !== '') resultArray.push(toPush);
+                }
+                else if (typeof obj[prop] !== 'undefined' && obj[prop] !== '') {
+                    // Should be string or plain value
+                    resultArray.push(var_name(prop) + '=' + var_value(obj[prop]));
+                }
+            }
+        }
+        return resultArray.join(separator);
+    };
     /**
      * 把用-区分开的单词转换成连接在一起的驼峰式字符串
      * 正则表达式/-(.)/g表示匹配-符号后面任何一个字符
