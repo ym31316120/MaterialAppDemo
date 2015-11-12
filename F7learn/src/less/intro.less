@@ -1,0 +1,64 @@
+//* 包含html body view*//
+
+/*==========html body================*/
+html,body {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+body {
+  font-family: @font-family-body;
+  margin: 0;
+  padding: 0;
+  color: @color-body;
+  font-size: @font-size-body;
+  line-height: @line-height-body;
+  width: 100%;
+  -webkit-text-size-adjust:100%;
+  background: @background-body;
+  overflow: hidden;
+}
+
+
+@media all and (width:1024px) and (height:691px) and (orientation:landscape) {
+  .deviceisIos671px(@device-name);
+}
+@media all and (width:1024px) and (height:692px) and (orientation:landscape){
+  .deviceisIos672px(@device-name)
+}
+//webkit-tap-highlight-color只用于iOS (iPhone和iPad)。当你点击一个链接或者通过Javascript定义的可点击元素的时候，它就会出现一个半透明的灰色背景
+//想要禁用这个高亮，设置颜色的alpha值为0即可。设置高亮色为50%透明的红色:-webkit-tap-highlight-color: rgba(255,0,0,0.5);
+//-webkit-touch-callout 当你触摸并按住触摸目标时候，禁止或显示系统默认菜单
+//none：系统默认菜单被禁用;inherit：系统默认菜单不被禁用
+* {
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+  -webkit-touch-callout:none;
+}
+a, input, textarea, select {
+  outline: 0;
+}
+//text-decoration 是对文本进行修饰作用
+a {
+  text-decoration: none;
+  color: @themeColor;
+}
+p {
+  margin: 1em 0;
+}
+
+
+/* === Views === */
+.views, .view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 5000;
+}
+.views {
+  .scrollable();
+}
+.view {
+  overflow: hidden;
+  box-sizing: border-box;
+}

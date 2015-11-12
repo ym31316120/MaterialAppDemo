@@ -212,6 +212,29 @@
         app.router = {
             //临时存放页面内容的DIV标签
             temporaryDom: document.createElement('div'),
+            // Find page or navbar in passed container which are related to View
+            findElement: function (selector, container, view, notCached) {
+                container = $(container);
+                if (notCached) selector = selector + ':not(.cached)';
+                var found = container.find(selector);
+                if (found.length > 1) {
+                    if (typeof view.selector === 'string') {
+                        // Search in related view
+                        found = container.find(view.selector + ' ' + selector);
+                    }
+                    if (found.length > 1) {
+                        // Search in main view
+                        found = container.find('.' + app.params.viewMainClass + ' ' + selector);
+                    }
+                }
+                if (found.length === 1) return found;
+                else {
+                    // Try to find non cached
+                    if (!notCached) found = app.router.findElement(selector, container, view, true);
+                    if (found && found.length === 1) return found;
+                    else return undefined;
+                }
+            },
             preroute: function (view, options) {
                 if ((app.params.preroute && app.params.preroute(view, options) === false) || (view && view.params.preroute && view.params.preroute(view, options) === false)) {
                     return true;
@@ -219,10 +242,383 @@
                     return false;
                 }
             },
+            preprocess: function (view, content, url, next) {
+                // Plugin hook
+                //app.pluginHook('routerPreprocess', view, content, url, next);
+
+                // Preprocess by plugin
+                //content = app.pluginProcess('preprocess', content);
+
+                if (view && view.params && view.params.preprocess) {
+                    content = view.params.preprocess(content, url, next);
+                    if (typeof content !== 'undefined') {
+                        next(content);
+                    }
+                }
+                else if (app.params.preprocess) {
+                    content = app.params.preprocess(content, url, next);
+                    if (typeof content !== 'undefined') {
+                        next(content);
+                    }
+                }
+                else {
+                    next(content);
+                }
+            },
 
 
         };
 
+        app.router._load = function (view, options) {
+            options = options || {};
+
+            var url = options.url,
+                content = options.content, //initial content
+                t7_rendered = {content: options.content},
+                template = options.template, // Template 7 compiled template
+                pageName = options.pageName,
+                viewContainer = $(view.container),
+                pagesContainer = $(view.pagesContainer),
+                animatePages = options.animatePages,
+                newPage, oldPage, pagesInView, i, oldNavbarInner, newNavbarInner, navbar, dynamicNavbar, reloadPosition,
+                isDynamicPage = typeof url === 'undefined' && content || template,
+                pushState = options.pushState;
+            if (typeof animatePages === 'undefined') animatePages = view.params.animatePages;
+
+            // Plugin hook
+            //app.pluginHook('routerLoad', view, options);
+
+            // Render with Template7
+            if (app.params.template7Pages && typeof content === 'string' || template) {
+                //t7_rendered = app.router.template7Render(view, options);
+                if (t7_rendered.content && !content) {
+                    content = t7_rendered.content;
+                }
+            }
+
+            app.router.temporaryDom.innerHTML = '';
+            // Parse DOM
+            if (!pageName) {
+                if ((typeof content === 'string') || (url && (typeof content === 'string'))) {
+                    app.router.temporaryDom.innerHTML = t7_rendered.content;
+                } else {
+                    if ('length' in content && content.length > 1) {
+                        for (var ci = 0; ci < content.length; ci++) {
+                            $(app.router.temporaryDom).append(content[ci]);
+                        }
+                    } else {
+                        $(app.router.temporaryDom).append(content);
+                    }
+                }
+            }
+            // Reload position
+            reloadPosition = options.reload && (options.reloadPrevious ? 'left' : 'center');
+
+            // Find new page
+            if (pageName) newPage = pagesContainer.find('.page[data-page="' + pageName + '"]');
+            else {
+                newPage = app.router.findElement('.page', app.router.temporaryDom, view);
+            }
+            // If page not found exit
+            if (!newPage || newPage.length === 0 || (pageName && view.activePage && view.activePage.name === pageName)) {
+                view.allowPageChange = true;
+                return;
+            }
+
+            newPage.addClass(options.reload ? 'page-on-' + reloadPosition : 'page-on-right');
+
+            // Find old page (should be the last one) and remove older pages
+            pagesInView = pagesContainer.children('.page:not(.cached)');
+            if (options.reload && options.reloadPrevious && pagesInView.length === 1) {
+                view.allowPageChange = true;
+                return;
+            }
+            console.log(pagesInView.length);
+            if (options.reload) {
+                oldPage = pagesInView.eq(pagesInView.length - 1);
+            }
+            else {
+                if (pagesInView.length > 1) {
+                    for (i = 0; i < pagesInView.length - 2; i++) {
+                        if (!view.params.domCache) {
+                            //app.pageRemoveCallback(view, pagesInView[i], 'left');
+                            $(pagesInView[i]).remove();
+                        }
+                        else {
+                            $(pagesInView[i]).addClass('cached');
+                        }
+                    }
+                    if (!view.params.domCache) {
+                        //app.pageRemoveCallback(view, pagesInView[i], 'left');
+                        $(pagesInView[i]).remove();
+                    }
+                    else {
+                        $(pagesInView[i]).addClass('cached');
+                    }
+                }
+                oldPage = pagesContainer.children('.page:not(.cached)');
+            }
+            if (view.params.domCache) newPage.removeClass('cached');
+
+            console.log(oldPage);
+            return false;
+
+            // Dynamic navbar
+            if (view.params.dynamicNavbar) {
+                dynamicNavbar = true;
+                // Find navbar
+                if (pageName) {
+                    newNavbarInner = viewContainer.find('.navbar-inner[data-page="' + pageName + '"]');
+                }
+                else {
+                    newNavbarInner = app.router.findElement('.navbar-inner', app.router.temporaryDom, view);
+                }
+                if (!newNavbarInner || newNavbarInner.length === 0) {
+                    dynamicNavbar = false;
+                }
+                navbar = viewContainer.find('.navbar');
+                if (options.reload) {
+                    oldNavbarInner = navbar.find('.navbar-inner:not(.cached):last-child');
+                }
+                else {
+                    oldNavbarInner = navbar.find('.navbar-inner:not(.cached)');
+
+                    if (oldNavbarInner.length > 0) {
+                        for (i = 0; i < oldNavbarInner.length - 1; i++) {
+                            if (!view.params.domCache) {
+                                app.navbarRemoveCallback(view, pagesInView[i], navbar[0], oldNavbarInner[i]);
+                                $(oldNavbarInner[i]).remove();
+                            }
+                            else
+                                $(oldNavbarInner[i]).addClass('cached');
+                        }
+                        if (!newNavbarInner && oldNavbarInner.length === 1) {
+                            if (!view.params.domCache) {
+                                app.navbarRemoveCallback(view, pagesInView[0], navbar[0], oldNavbarInner[0]);
+                                $(oldNavbarInner[0]).remove();
+                            }
+                            else
+                                $(oldNavbarInner[0]).addClass('cached');
+                        }
+                        oldNavbarInner = navbar.find('.navbar-inner:not(.cached)');
+                    }
+                }
+            }
+            if (dynamicNavbar) {
+                newNavbarInner.addClass(options.reload ? 'navbar-on-' + reloadPosition : 'navbar-on-right');
+                if (view.params.domCache) newNavbarInner.removeClass('cached');
+                newPage[0].f7RelatedNavbar = newNavbarInner[0];
+                newNavbarInner[0].f7RelatedPage = newPage[0];
+            }
+
+            // save content areas into view's cache
+            if (!url) {
+                var newPageName = pageName || newPage.attr('data-page');
+                if (isDynamicPage) url = '#' + app.params.dynamicPageUrl.replace(/{{name}}/g, newPageName).replace(/{{index}}/g, view.history.length - (options.reload ? 1 : 0));
+                else url = '#' + newPageName;
+                if (!view.params.domCache) {
+                    view.contentCache[url] = content;
+                }
+                if (view.params.domCache && pageName) {
+                    view.pagesCache[url] = pageName;
+                }
+            }
+
+            // Push State
+            if (app.params.pushState && !options.reloadPrevious && view.main) {
+                if (typeof pushState === 'undefined') pushState = true;
+                var pushStateRoot = app.params.pushStateRoot || '';
+                var method = options.reload ? 'replaceState' : 'pushState';
+                if (pushState) {
+                    if (!isDynamicPage && !pageName) {
+                        history[method]({
+                            url: url,
+                            viewIndex: app.views.indexOf(view)
+                        }, '', pushStateRoot + app.params.pushStateSeparator + url);
+                    }
+                    else if (isDynamicPage && content) {
+                        history[method]({
+                            content: content,
+                            url: url,
+                            viewIndex: app.views.indexOf(view)
+                        }, '', pushStateRoot + app.params.pushStateSeparator + url);
+                    }
+                    else if (pageName) {
+                        history[method]({
+                            pageName: pageName,
+                            url: url,
+                            viewIndex: app.views.indexOf(view)
+                        }, '', pushStateRoot + app.params.pushStateSeparator + url);
+                    }
+                }
+            }
+
+            // Update View history
+            view.url = url;
+            if (options.reload) {
+                var lastUrl = view.history[view.history.length - (options.reloadPrevious ? 2 : 1)];
+                if (lastUrl && lastUrl.indexOf('#') === 0 && lastUrl in view.contentCache && lastUrl !== url) {
+                    view.contentCache[lastUrl] = null;
+                    delete view.contentCache[lastUrl];
+                }
+                view.history[view.history.length - (options.reloadPrevious ? 2 : 1)] = url;
+            }
+            else {
+                view.history.push(url);
+            }
+
+            // Unique history
+            var historyBecameUnique = false;
+            if (view.params.uniqueHistory) {
+                var _history = view.history;
+                var _url = url;
+                if (view.params.uniqueHistoryIgnoreGetParameters) {
+                    _history = [];
+                    _url = url.split('?')[0];
+                    for (i = 0; i < view.history.length; i++) {
+                        _history.push(view.history[i].split('?')[0]);
+                    }
+                }
+
+                if (_history.indexOf(_url) !== _history.lastIndexOf(_url)) {
+                    view.history = view.history.slice(0, _history.indexOf(_url));
+                    view.history.push(url);
+                    historyBecameUnique = true;
+                }
+            }
+            // Dom manipulations
+            if (options.reloadPrevious) {
+                oldPage = oldPage.prev('.page');
+                newPage.insertBefore(oldPage);
+                if (dynamicNavbar) {
+                    oldNavbarInner = oldNavbarInner.prev('.navbar-inner');
+                    newNavbarInner.insertAfter(oldNavbarInner);
+                }
+            }
+            else {
+                pagesContainer.append(newPage[0]);
+                if (dynamicNavbar) navbar.append(newNavbarInner[0]);
+            }
+            // Remove Old Page And Navbar
+            if (options.reload) {
+                if (view.params.domCache && view.initialPages.indexOf(oldPage[0]) >= 0) {
+                    oldPage.addClass('cached');
+                    if (dynamicNavbar) oldNavbarInner.addClass('cached');
+                }
+                else {
+                    app.pageRemoveCallback(view, oldPage[0], reloadPosition);
+                    if (dynamicNavbar) app.navbarRemoveCallback(view, oldPage[0], navbar[0], oldNavbarInner[0]);
+                    oldPage.remove();
+                    if (dynamicNavbar) oldNavbarInner.remove();
+                }
+            }
+
+            // Page Init Events
+            app.pageInitCallback(view, {
+                pageContainer: newPage[0],
+                url: url,
+                position: options.reload ? reloadPosition : 'right',
+                navbarInnerContainer: dynamicNavbar ? newNavbarInner && newNavbarInner[0] : undefined,
+                oldNavbarInnerContainer: dynamicNavbar ? oldNavbarInner && oldNavbarInner[0] : undefined,
+                context: t7_rendered.context,
+                query: options.query,
+                fromPage: oldPage && oldPage.length && oldPage[0].f7PageData,
+                reload: options.reload,
+                reloadPrevious: options.reloadPrevious
+            });
+
+            // Navbar init event
+            if (dynamicNavbar) {
+                app.navbarInitCallback(view, newPage[0], navbar[0], newNavbarInner[0], url, options.reload ? reloadPosition : 'right');
+            }
+
+            if (options.reload) {
+                view.allowPageChange = true;
+                if (historyBecameUnique) view.refreshPreviousPage();
+                return;
+            }
+
+            if (dynamicNavbar && animatePages) {
+                app.router.prepareNavbar(newNavbarInner, oldNavbarInner, 'right');
+            }
+            // Force reLayout
+            var clientLeft = newPage[0].clientLeft;
+
+            // Before Anim Callback
+            app.pageAnimCallback('before', view, {
+                pageContainer: newPage[0],
+                url: url,
+                position: 'right',
+                oldPage: oldPage,
+                newPage: newPage,
+                query: options.query,
+                fromPage: oldPage && oldPage.length && oldPage[0].f7PageData
+            });
+
+            function afterAnimation() {
+                view.allowPageChange = true;
+                newPage.removeClass('page-from-right-to-center page-on-right page-on-left').addClass('page-on-center');
+                oldPage.removeClass('page-from-center-to-left page-on-center page-on-right').addClass('page-on-left');
+                if (dynamicNavbar) {
+                    newNavbarInner.removeClass('navbar-from-right-to-center navbar-on-left navbar-on-right').addClass('navbar-on-center');
+                    oldNavbarInner.removeClass('navbar-from-center-to-left navbar-on-center navbar-on-right').addClass('navbar-on-left');
+                }
+                app.pageAnimCallback('after', view, {
+                    pageContainer: newPage[0],
+                    url: url,
+                    position: 'right',
+                    oldPage: oldPage,
+                    newPage: newPage,
+                    query: options.query,
+                    fromPage: oldPage && oldPage.length && oldPage[0].f7PageData
+                });
+                if (app.params.pushState && view.main) app.pushStateClearQueue();
+                if (!(view.params.swipeBackPage || view.params.preloadPreviousPage)) {
+                    if (view.params.domCache) {
+                        oldPage.addClass('cached');
+                        oldNavbarInner.addClass('cached');
+                    }
+                    else {
+                        if (!(url.indexOf('#') === 0 && newPage.attr('data-page').indexOf('smart-select-') === 0)) {
+                            app.pageRemoveCallback(view, oldPage[0], 'left');
+                            if (dynamicNavbar) app.navbarRemoveCallback(view, oldPage[0], navbar[0], oldNavbarInner[0]);
+                            oldPage.remove();
+                            if (dynamicNavbar) oldNavbarInner.remove();
+                        }
+                    }
+                }
+                if (view.params.uniqueHistory && historyBecameUnique) {
+                    view.refreshPreviousPage();
+                }
+            }
+
+            if (animatePages) {
+                // Set pages before animation
+                if (app.params.material && app.params.materialPageLoadDelay) {
+                    setTimeout(function () {
+                        app.router.animatePages(oldPage, newPage, 'to-left', view);
+                    }, app.params.materialPageLoadDelay);
+                }
+                else {
+                    app.router.animatePages(oldPage, newPage, 'to-left', view);
+                }
+
+                // Dynamic navbar animation
+                if (dynamicNavbar) {
+                    setTimeout(function () {
+                        app.router.animateNavbars(oldNavbarInner, newNavbarInner, 'to-left', view);
+                    }, 0);
+                }
+                newPage.animationEnd(function (e) {
+                    afterAnimation();
+                });
+            }
+            else {
+                if (dynamicNavbar) newNavbarInner.find('.sliding, .sliding .back .icon').transform('');
+                afterAnimation();
+            }
+
+        };
 
         app.router.load = function (view, options) {
             if (app.router.preroute(view, options)) {
@@ -256,10 +652,10 @@
             }
 
             function proceed(content) {
-                //app.router.preprocess(view, content, url, function (content) {
-                //    options.content = content;
-                //    app.router._load(view, options);
-                //});
+                app.router.preprocess(view, content, url, function (content) {
+                    options.content = content;
+                    app.router._load(view, options);
+                });
             }
 
             if (content || pageName) {
@@ -286,6 +682,348 @@
 
         };
 
+
+        /*======================================================
+         ************   Pages   ************
+         ======================================================*/
+// Page Callbacks API
+        app.pageCallbacks = {};
+
+        app.onPage = function (callbackName, pageName, callback) {
+            if (pageName && pageName.split(' ').length > 1) {
+                var pageNames = pageName.split(' ');
+                var returnCallbacks = [];
+                for (var i = 0; i < pageNames.length; i++) {
+                    returnCallbacks.push(app.onPage(callbackName, pageNames[i], callback));
+                }
+                returnCallbacks.remove = function () {
+                    for (var i = 0; i < returnCallbacks.length; i++) {
+                        returnCallbacks[i].remove();
+                    }
+                };
+                returnCallbacks.trigger = function () {
+                    for (var i = 0; i < returnCallbacks.length; i++) {
+                        returnCallbacks[i].trigger();
+                    }
+                };
+                return returnCallbacks;
+            }
+            var callbacks = app.pageCallbacks[callbackName][pageName];
+            if (!callbacks) {
+                callbacks = app.pageCallbacks[callbackName][pageName] = [];
+            }
+            app.pageCallbacks[callbackName][pageName].push(callback);
+            return {
+                remove: function () {
+                    var removeIndex;
+                    for (var i = 0; i < callbacks.length; i++) {
+                        if (callbacks[i].toString() === callback.toString()) {
+                            removeIndex = i;
+                        }
+                    }
+                    if (typeof removeIndex !== 'undefined') callbacks.splice(removeIndex, 1);
+                },
+                trigger: callback
+            };
+        };
+
+//Create callbacks methods dynamically
+        function createPageCallback(callbackName) {
+            var capitalized = callbackName.replace(/^./, function (match) {
+                return match.toUpperCase();
+            });
+            app['onPage' + capitalized] = function (pageName, callback) {
+                return app.onPage(callbackName, pageName, callback);
+            };
+        }
+
+        var pageCallbacksNames = ('beforeInit init reinit beforeAnimation afterAnimation back afterBack beforeRemove').split(' ');
+        for (var i = 0; i < pageCallbacksNames.length; i++) {
+            app.pageCallbacks[pageCallbacksNames[i]] = {};
+            createPageCallback(pageCallbacksNames[i]);
+        }
+
+        app.triggerPageCallbacks = function (callbackName, pageName, pageData) {
+            var allPagesCallbacks = app.pageCallbacks[callbackName]['*'];
+            if (allPagesCallbacks) {
+                for (var j = 0; j < allPagesCallbacks.length; j++) {
+                    allPagesCallbacks[j](pageData);
+                }
+            }
+            var callbacks = app.pageCallbacks[callbackName][pageName];
+            if (!callbacks || callbacks.length === 0) return;
+            for (var i = 0; i < callbacks.length; i++) {
+                callbacks[i](pageData);
+            }
+        };
+
+// On Page Init Callback
+        app.pageInitCallback = function (view, params) {
+            var pageContainer = params.pageContainer;
+            if (pageContainer.f7PageInitialized && view && !view.params.domCache) return;
+
+            var pageQuery = params.query;
+            if (!pageQuery) {
+                if (params.url && params.url.indexOf('?') > 0) {
+                    pageQuery = $.parseUrlQuery(params.url || '');
+                }
+                else if (pageContainer.f7PageData && pageContainer.f7PageData.query) {
+                    pageQuery = pageContainer.f7PageData.query;
+                }
+                else {
+                    pageQuery = {};
+                }
+            }
+
+            // Page Data
+            var pageData = {
+                container: pageContainer,
+                url: params.url,
+                query: pageQuery,
+                name: $(pageContainer).attr('data-page'),
+                view: view,
+                from: params.position,
+                context: params.context,
+                navbarInnerContainer: params.navbarInnerContainer,
+                fromPage: params.fromPage
+            };
+            if (params.fromPage && !params.fromPage.navbarInnerContainer && params.oldNavbarInnerContainer) {
+                params.fromPage.navbarInnerContainer = params.oldNavbarInnerContainer;
+            }
+
+            if (pageContainer.f7PageInitialized && ((view && view.params.domCache) || (!view && $(pageContainer).parents('.popup, .popover, .login-screen, .modal, .actions-modal, .picker-modal').length > 0))) {
+                // Reinit Page
+                app.reinitPage(pageContainer);
+
+                // Callbacks
+                //app.pluginHook('pageReinit', pageData);
+                if (app.params.onPageReinit) app.params.onPageReinit(app, pageData);
+                app.triggerPageCallbacks('reinit', pageData.name, pageData);
+                $(pageData.container).trigger('pageReinit', {page: pageData});
+                return;
+            }
+            pageContainer.f7PageInitialized = true;
+
+            // Store pagedata in page
+            pageContainer.f7PageData = pageData;
+
+            // Update View's activePage
+            if (view && !params.preloadOnly && !params.reloadPrevious) {
+                // Add data-page on view
+                $(view.container).attr('data-page', pageData.name);
+                // Update View active page data
+                view.activePage = pageData;
+            }
+
+            // Before Init Callbacks
+            app.pluginHook('pageBeforeInit', pageData);
+            if (app.params.onPageBeforeInit) app.params.onPageBeforeInit(app, pageData);
+            app.triggerPageCallbacks('beforeInit', pageData.name, pageData);
+            $(pageData.container).trigger('pageBeforeInit', {page: pageData});
+
+            // Init page
+            app.initPage(pageContainer);
+
+            // Init Callback
+            app.pluginHook('pageInit', pageData);
+            if (app.params.onPageInit) app.params.onPageInit(app, pageData);
+            app.triggerPageCallbacks('init', pageData.name, pageData);
+            $(pageData.container).trigger('pageInit', {page: pageData});
+        };
+        app.pageRemoveCallback = function (view, pageContainer, position) {
+            var pageContext;
+            if (pageContainer.f7PageData) pageContext = pageContainer.f7PageData.context;
+            // Page Data
+            var pageData = {
+                container: pageContainer,
+                name: $(pageContainer).attr('data-page'),
+                view: view,
+                url: pageContainer.f7PageData && pageContainer.f7PageData.url,
+                query: pageContainer.f7PageData && pageContainer.f7PageData.query,
+                navbarInnerContainer: pageContainer.f7PageData && pageContainer.f7PageData.navbarInnerContainer,
+                from: position,
+                context: pageContext
+            };
+            // Before Init Callback
+            app.pluginHook('pageBeforeRemove', pageData);
+            if (app.params.onPageBeforeRemove) app.params.onPageBeforeRemove(app, pageData);
+            app.triggerPageCallbacks('beforeRemove', pageData.name, pageData);
+            $(pageData.container).trigger('pageBeforeRemove', {page: pageData});
+        };
+        app.pageBackCallback = function (callback, view, params) {
+            // Page Data
+            var pageContainer = params.pageContainer;
+            var pageContext;
+            if (pageContainer.f7PageData) pageContext = pageContainer.f7PageData.context;
+
+            var pageData = {
+                container: pageContainer,
+                name: $(pageContainer).attr('data-page'),
+                url: pageContainer.f7PageData && pageContainer.f7PageData.url,
+                query: pageContainer.f7PageData && pageContainer.f7PageData.query,
+                view: view,
+                from: params.position,
+                context: pageContext,
+                navbarInnerContainer: pageContainer.f7PageData && pageContainer.f7PageData.navbarInnerContainer,
+                swipeBack: params.swipeBack
+            };
+
+            if (callback === 'after') {
+                app.pluginHook('pageAfterBack', pageData);
+                if (app.params.onPageAfterBack) app.params.onPageAfterBack(app, pageData);
+                app.triggerPageCallbacks('afterBack', pageData.name, pageData);
+                $(pageContainer).trigger('pageAfterBack', {page: pageData});
+
+            }
+            if (callback === 'before') {
+                app.pluginHook('pageBack', pageData);
+                if (app.params.onPageBack) app.params.onPageBack(app, pageData);
+                app.triggerPageCallbacks('back', pageData.name, pageData);
+                $(pageData.container).trigger('pageBack', {page: pageData});
+            }
+        };
+        app.pageAnimCallback = function (callback, view, params) {
+            var pageContainer = params.pageContainer;
+            var pageContext;
+            if (pageContainer.f7PageData) pageContext = pageContainer.f7PageData.context;
+
+            var pageQuery = params.query;
+            if (!pageQuery) {
+                if (params.url && params.url.indexOf('?') > 0) {
+                    pageQuery = $.parseUrlQuery(params.url || '');
+                }
+                else if (pageContainer.f7PageData && pageContainer.f7PageData.query) {
+                    pageQuery = pageContainer.f7PageData.query;
+                }
+                else {
+                    pageQuery = {};
+                }
+            }
+            // Page Data
+            var pageData = {
+                container: pageContainer,
+                url: params.url,
+                query: pageQuery,
+                name: $(pageContainer).attr('data-page'),
+                view: view,
+                from: params.position,
+                context: pageContext,
+                swipeBack: params.swipeBack,
+                navbarInnerContainer: pageContainer.f7PageData && pageContainer.f7PageData.navbarInnerContainer,
+                fromPage: params.fromPage
+            };
+            var oldPage = params.oldPage,
+                newPage = params.newPage;
+
+            // Update page date
+            pageContainer.f7PageData = pageData;
+
+            if (callback === 'after') {
+                app.pluginHook('pageAfterAnimation', pageData);
+                if (app.params.onPageAfterAnimation) app.params.onPageAfterAnimation(app, pageData);
+                app.triggerPageCallbacks('afterAnimation', pageData.name, pageData);
+                $(pageData.container).trigger('pageAfterAnimation', {page: pageData});
+
+            }
+            if (callback === 'before') {
+                // Add data-page on view
+                $(view.container).attr('data-page', pageData.name);
+
+                // Update View's activePage
+                if (view) view.activePage = pageData;
+
+                // Hide/show navbar dynamically
+                if (newPage.hasClass('no-navbar') && !oldPage.hasClass('no-navbar')) {
+                    view.hideNavbar();
+                }
+                if (!newPage.hasClass('no-navbar') && (oldPage.hasClass('no-navbar') || oldPage.hasClass('no-navbar-by-scroll'))) {
+                    view.showNavbar();
+                }
+                // Hide/show navbar toolbar
+                if (newPage.hasClass('no-toolbar') && !oldPage.hasClass('no-toolbar')) {
+                    view.hideToolbar();
+                }
+                if (!newPage.hasClass('no-toolbar') && (oldPage.hasClass('no-toolbar') || oldPage.hasClass('no-toolbar-by-scroll'))) {
+                    view.showToolbar();
+                }
+                // Hide/show tabbar
+                var tabBar;
+                if (newPage.hasClass('no-tabbar') && !oldPage.hasClass('no-tabbar')) {
+                    tabBar = $(view.container).find('.tabbar');
+                    if (tabBar.length === 0) tabBar = $(view.container).parents('.' + app.params.viewsClass).find('.tabbar');
+                    app.hideToolbar(tabBar);
+                }
+                if (!newPage.hasClass('no-tabbar') && (oldPage.hasClass('no-tabbar') || oldPage.hasClass('no-tabbar-by-scroll'))) {
+                    tabBar = $(view.container).find('.tabbar');
+                    if (tabBar.length === 0) tabBar = $(view.container).parents('.' + app.params.viewsClass).find('.tabbar');
+                    app.showToolbar(tabBar);
+                }
+
+                oldPage.removeClass('no-navbar-by-scroll no-toolbar-by-scroll');
+                // Callbacks
+                app.pluginHook('pageBeforeAnimation', pageData);
+                if (app.params.onPageBeforeAnimation) app.params.onPageBeforeAnimation(app, pageData);
+                app.triggerPageCallbacks('beforeAnimation', pageData.name, pageData);
+                $(pageData.container).trigger('pageBeforeAnimation', {page: pageData});
+            }
+        };
+
+// Init Page Events and Manipulations
+        app.initPage = function (pageContainer) {
+            pageContainer = $(pageContainer);
+            if (pageContainer.length === 0) return;
+            // Size navbars on page load
+            //if (app.sizeNavbars) app.sizeNavbars(pageContainer.parents('.' + app.params.viewClass)[0]);
+            //// Init messages
+            //if (app.initPageMessages) app.initPageMessages(pageContainer);
+            //// Init forms storage
+            //if (app.initFormsStorage) app.initFormsStorage(pageContainer);
+            //// Init smart select
+            //if (app.initSmartSelects) app.initSmartSelects(pageContainer);
+            //// Init slider
+            //if (app.initPageSwiper) app.initPageSwiper(pageContainer);
+            //// Init pull to refres
+            //if (app.initPullToRefresh) app.initPullToRefresh(pageContainer);
+            //// Init infinite scroll
+            //if (app.initInfiniteScroll) app.initInfiniteScroll(pageContainer);
+            //// Init searchbar
+            //if (app.initSearchbar) app.initSearchbar(pageContainer);
+            //// Init message bar
+            //if (app.initPageMessagebar) app.initPageMessagebar(pageContainer);
+            //// Init scroll toolbars
+            //if (app.initScrollToolbars) app.initScrollToolbars(pageContainer);
+            //// Init lazy images
+            //if (app.initImagesLazyLoad) app.initImagesLazyLoad(pageContainer);
+            //// Init resizeable textareas
+            //if (app.initPageResizableTextareas) app.initPageResizableTextareas(pageContainer);
+            //// Init Material Preloader
+            //if (app.params.material && app.initPageMaterialPreloader) app.initPageMaterialPreloader(pageContainer);
+            //// Init Material Inputs
+            //if (app.params.material && app.initPageMaterialInputs) app.initPageMaterialInputs(pageContainer);
+            //// Init Material Tabbar
+            //if (app.params.material && app.initPageMaterialTabbar) app.initPageMaterialTabbar(pageContainer);
+        };
+        app.reinitPage = function (pageContainer) {
+            pageContainer = $(pageContainer);
+            if (pageContainer.length === 0) return;
+            // Size navbars on page reinit
+            //if (app.sizeNavbars) app.sizeNavbars(pageContainer.parents('.' + app.params.viewClass)[0]);
+            // Reinit slider
+            //if (app.reinitPageSwiper) app.reinitPageSwiper(pageContainer);
+            // Reinit lazy load
+            //if (app.reinitLazyLoad) app.reinitLazyLoad(pageContainer);
+        };
+        app.initPageWithCallback = function (pageContainer) {
+            pageContainer = $(pageContainer);
+            var viewContainer = pageContainer.parents('.' + app.params.viewClass);
+            if (viewContainer.length === 0) return;
+            var view = viewContainer[0].f7View || undefined;
+            var url = view && view.url ? view.url : undefined;
+            if (viewContainer && pageContainer.attr('data-page')) {
+                viewContainer.attr('data-page', pageContainer.attr('data-page'));
+            }
+            app.pageInitCallback(view, {pageContainer: pageContainer[0], url: url, position: 'center'});
+        };
 
         /**
          * 处理单击事件，实现link，button等元素的单击事件及效果
@@ -404,13 +1142,13 @@
             }
 
             //下面调用Ajax进行数据获取
-            console.log("app.get=="+url);
+            console.log("app.get==" + url);
             app.xhr = $.ajax({
                 url: url,
                 method: 'GET',
                 beforeSend: app.params.onAjaxStart,
-                complete:function(xhr){
-                    console.log("complete="+xhr.status);
+                complete: function (xhr) {
+                    console.log("complete=" + xhr.status);
                     if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
                         if (app.params.cache && !ignoreCache) {
                             app.removeFromCache(_url);
@@ -427,7 +1165,7 @@
                     }
                     if (app.params.onAjaxComplete) app.params.onAjaxComplete(xhr);
                 },
-                error: function(xhr){
+                error: function (xhr) {
                     callback(xhr.responseText, true);
                     if (app.params.onAjaxError) app.params.onAjaxError(xhr);
                 }
@@ -544,6 +1282,28 @@ var Dom7 = (function () {
      * @type {{}}
      ---------------------------------*/
     Dom7.prototype = {
+        // Classes and attriutes
+        addClass: function (className) {
+            if (typeof className === 'undefined') {
+                return this;
+            }
+            var classes = className.split(' ');
+            for (var i = 0; i < classes.length; i++) {
+                for (var j = 0; j < this.length; j++) {
+                    if (typeof this[j].classList !== 'undefined') this[j].classList.add(classes[i]);
+                }
+            }
+            return this;
+        },
+        removeClass: function (className) {
+            var classes = className.split(' ');
+            for (var i = 0; i < classes.length; i++) {
+                for (var j = 0; j < this.length; j++) {
+                    if (typeof this[j].classList !== 'undefined') this[j].classList.remove(classes[i]);
+                }
+            }
+            return this;
+        },
         /**
          * 一个参数并且是字符串则获取默认第一个元素的属性值
          * 两个参数attrs是字符串则对所有的元素进行属性的赋值操作
@@ -602,6 +1362,28 @@ var Dom7 = (function () {
                     this[i].style[props] = value;
                 }
                 return this;
+            }
+            return this;
+        },
+        children: function (selector) {
+            var children = [];
+            for (var i = 0; i < this.length; i++) {
+                var childNodes = this[i].childNodes;
+
+                for (var j = 0; j < childNodes.length; j++) {
+                    if (!selector) {
+                        if (childNodes[j].nodeType === 1) children.push(childNodes[j]);
+                    }
+                    else {
+                        if (childNodes[j].nodeType === 1 && $(childNodes[j]).is(selector)) children.push(childNodes[j]);
+                    }
+                }
+            }
+            return new Dom7($.unique(children));
+        },
+        remove: function () {
+            for (var i = 0; i < this.length; i++) {
+                if (this[i].parentNode) this[i].parentNode.removeChild(this[i]);
             }
             return this;
         },
@@ -717,6 +1499,32 @@ var Dom7 = (function () {
             }
 
         },
+        insertBefore: function (selector) {
+            var before = $(selector);
+            for (var i = 0; i < this.length; i++) {
+                if (before.length === 1) {
+                    before[0].parentNode.insertBefore(this[i], before[0]);
+                }
+                else if (before.length > 1) {
+                    for (var j = 0; j < before.length; j++) {
+                        before[j].parentNode.insertBefore(this[i].cloneNode(true), before[j]);
+                    }
+                }
+            }
+        },
+        insertAfter: function (selector) {
+            var after = $(selector);
+            for (var i = 0; i < this.length; i++) {
+                if (after.length === 1) {
+                    after[0].parentNode.insertBefore(this[i], after[0].nextSibling);
+                }
+                else if (after.length > 1) {
+                    for (var j = 0; j < after.length; j++) {
+                        after[j].parentNode.insertBefore(this[i].cloneNode(true), after[j].nextSibling);
+                    }
+                }
+            }
+        },
         /**
          * 给元素增加事件监听，并可以通过targetSelector对事件的执行元素进行过滤控制
          * @param eventName  事件名称
@@ -780,6 +1588,33 @@ var Dom7 = (function () {
                 }
             }
             return $($.unique(parents));
+        },
+        prev: function (selector) {
+            if (this.length > 0) {
+                if (selector) {
+                    if (this[0].previousElementSibling && $(this[0].previousElementSibling).is(selector)) return new Dom7([this[0].previousElementSibling]);
+                    else return new Dom7([]);
+                }
+                else {
+                    if (this[0].previousElementSibling) return new Dom7([this[0].previousElementSibling]);
+                    else return new Dom7([]);
+                }
+            }
+            else return new Dom7([]);
+        },
+        prevAll: function (selector) {
+            var prevEls = [];
+            var el = this[0];
+            if (!el) return new Dom7([]);
+            while (el.previousElementSibling) {
+                var prev = el.previousElementSibling;
+                if (selector) {
+                    if ($(prev).is(selector)) prevEls.push(prev);
+                }
+                else prevEls.push(prev);
+                el = prev;
+            }
+            return new Dom7(prevEls);
         },
         /**
          * 触发选中元素上的事件，指定所有的事件回调函数
@@ -931,7 +1766,6 @@ var Dom7 = (function () {
             }
         }
 
-        console.log(options);
 
         // Create XHR
         var xhr = new XMLHttpRequest();
@@ -1014,7 +1848,6 @@ var Dom7 = (function () {
         var xhrTimeout;
         // Handle XHR
         xhr.onload = function (e) {
-            console.log("xhr.load");
             if (xhrTimeout) clearTimeout(xhrTimeout);
             if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
                 var responseData;
@@ -1053,9 +1886,7 @@ var Dom7 = (function () {
 
 
         // Send XHR
-        console.log("before send");
         xhr.send(postData);
-        console.log("after send");
         // Timeout
         if (options.timeout > 0) {
             xhr.onabort = function () {
